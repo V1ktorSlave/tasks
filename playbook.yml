@@ -1,0 +1,158 @@
+---
+- name: update
+  hosts: SERVERS
+  tasks:
+    - name: update
+      apt:
+        update_cache: yes
+- name: NGINX configuration
+  hosts: NGINX
+  tasks:
+  - name: install NGINX
+    apt:
+      package: nginx
+  tasks:
+  - name: configuration
+    copy:
+      remote_src: no
+      src: /home/kali/nginx.conf
+      dest: /etc/nginx/sites-enabled/
+  - name: configuration wordpress
+    copy:
+      remote_src: no
+      src: /home/kali/wp-config.php
+      dest: /var/www/html/
+
+  tasks:
+  - name: check wordpress (NGINX)
+    stat:
+      path: /var/www/html/readme.html
+    register: stat_result
+
+  - name: Create the file, if it doesnt exist already (NGINX)
+    unarchive:
+      src: https://wordpress.org/latest.tar.gz
+      dest: /var/www/html
+      extra_opts: [--strip-components=1]
+      remote_src: yes
+    when: not stat_result.stat.exists 
+
+  - name: Restart nginx
+    systemd:
+       state: restarted
+       daemon_reload: yes
+       name: nginx
+
+- name: PHP configuration
+  hosts: PHP
+  tasks:
+  - name: install PHP
+    apt:
+      name:
+      - php8.1-fpm
+      - php8.1-mysql
+      - php8.1-curl
+      - php8.1-gd
+      - php8.1-intl
+      - php8.1-mbstring
+      - php8.1-soap
+      - php8.1-xml
+      - php8.1-xmlrpc
+      - php8.1-zip
+      - mysql-client
+      - python3-dev
+      - libmysqlclient-dev
+      - python3-mysqldb
+      state: latest
+  tasks:
+  - name: configuration
+    copy:
+      remote_src: no
+      src: /home/kali/www.conf
+      dest: /etc/php/8.1/fpm/pool.d/
+  - name: configuration wordpress
+    copy:
+      remote_src: no
+      src: /home/kali/wp-config.php
+      dest: /var/www/html/
+#      notify: "Restart PHP"
+  tasks:
+  - name: check wordpress (PHP)
+    stat:
+      path: /var/www/html/readme.html
+    register: stat_result
+
+  - name: Create the file, if it doesnt exist already (PHP)
+    unarchive:
+      src: https://wordpress.org/latest.tar.gz
+      dest: /var/www/html
+      extra_opts: [--strip-components=1]
+      remote_src: yes
+    when: not stat_result.stat.exists
+
+
+# handlers
+  - name: Restart PHP
+    systemd:
+      state: restarted
+      daemon_reload: yes
+      name: php8.1-fpm
+
+- name: MySQL configuration
+  hosts: MySQL
+  tasks:
+  - name: install MySQL
+    apt:
+      name:
+      - mysql-server
+      - mysql-client
+      - python3-dev
+      - libmysqlclient-dev
+      - python3-mysqldb
+      state: latest
+  - name: configuration
+    copy:
+      remote_src: no
+      src: /home/kali/mysqld.cnf
+      dest: /etc/mysql/mysql.conf.d/
+
+  - name: mysql_db
+    mysql_db:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name:
+      - "wordpress"
+      state: present
+  - name: Create database
+    mysql_user:
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      name: "wordpress"
+      host: "192.168.%"
+      password: "P@ssw0rd"
+      priv: 'wordpress.*:ALL PRIVILEGES'
+      state: present
+
+  - name: Restart Mysql
+    systemd:
+       state: restarted
+       daemon_reload: yes
+       name: mysql
+
+
+- name: iptables nginx
+  hosts: NGINX
+  tasks:
+  - name:
+    shell:
+      cmd: iptables -t filter -A INPUT -p tcp --dport 80 -j ACCEPT ; iptables -t filter -A INPUT -p tcp --dport 22 -j ACCEPT 
+- name: iptables php
+  hosts: php
+  tasks:
+  - name:
+    shell:
+      cmd: iptables -t filter -A INPUT -p tcp --dport 9000 -j ACCEPT ; iptables -t filter -A INPUT -p tcp --dport 22 -j ACCEPT
+- name: iptables MySql
+  hosts: MySQL
+  tasks:
+  - name:
+    shell:
+      cmd: iptables -t filter -A INPUT -p tcp --dport 3306 -j ACCEPT ; iptables -t filter -A INPUT -p tcp --dport 22 -j ACCEPT
