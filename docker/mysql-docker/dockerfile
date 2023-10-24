@@ -1,0 +1,9 @@
+# Используем базовый образ MySQL
+FROM mysql:latest
+
+# Устанавливаем пароль для пользователя root
+ENV MYSQL_ROOT_PASSWORD P@ssw0rd
+
+# Копируем файл с тестовой базой данных в контейнер
+COPY ./testdb.sql /docker-entrypoint-initdb.d/
+

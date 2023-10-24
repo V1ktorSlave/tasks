@@ -1,0 +1,11 @@
+# Используем базовый образ Debian (kali)
+FROM ubuntu:20.04
+
+# Обновляем список пакетов и устанавливаем необходимые утилиты
+RUN apt-get update && apt-get install -y wget curl nginx
+
+# Копируем файлы произвольного сайта из локальной директории в контейнер
+COPY ./nginx.conf /etc/nginx/nginx.conf
+
+# Запускаем Nginx при старте контейнера
+CMD ["nginx", "-g", "daemon off;"]
